@@ -2,7 +2,6 @@ package db;
 
 import org.apache.commons.codec.digest.DigestUtils;
 
-import java.nio.file.attribute.UserDefinedFileAttributeView;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;

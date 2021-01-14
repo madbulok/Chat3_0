@@ -7,6 +7,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Vector;
+import java.util.logging.*;
 
 public class Server {
     private List<ClientHandler> clients;
@@ -15,13 +16,19 @@ public class Server {
     private Socket socket = null;
 
     private OperationMutable dbService;
+    private final Logger logger = Logger.getLogger(Server.class.getName());
+    private Handler consoleHandler;
+    private Handler fileHandler;
 
     public Server(){
+
+        prepareLogger();
+
         clients = new Vector<>();
         try {
             server = new ServerSocket(PORT);
             dbService = new DatabaseRepository();
-            System.out.println("Server is running...");
+            logger.log(Level.INFO, "Сервер запущен");
 
             while (true){
                 socket = server.accept();
@@ -31,24 +38,41 @@ public class Server {
 
         } catch (IOException e){
             e.printStackTrace();
+            logger.log(Level.INFO,"Ошибка: " + e.getMessage());
         } finally {
             try {
                 if (server != null && !server.isClosed()) {
                     server.close();
                 }
                 if (dbService != null) {
-                    System.out.println("Соединение с БД закрыто.");
+                    logger.log(Level.INFO,"Соединение с БД закрыто.");
                     dbService.close();
                 }
-                System.out.println("Вы отключены от чата!");
+                logger.log(Level.INFO,"Вы отключены от чата!");
             } catch (IOException e) {
                 e.printStackTrace();
+                logger.log(Level.INFO,"Ошибка: " + e.getMessage());
             }
+        }
+    }
+
+    private void prepareLogger() {
+        consoleHandler = new ConsoleHandler();
+        try {
+            fileHandler = new FileHandler(new Date().toString().replace(":","-")+".log", true);
+            fileHandler.setFormatter(new SimpleFormatter());
+            logger.addHandler(consoleHandler);
+            logger.addHandler(fileHandler);
+            logger.setUseParentHandlers(false);
+            logger.setLevel(Level.INFO);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
     void broadcastMessage(ClientHandler clientHandler, String msg){
         SimpleDateFormat formatter = new SimpleDateFormat("HH:mm:ss");
+        logger.log(Level.INFO,clientHandler.getNickname() + " - [ " + msg + " ]");
 
         String message = String.format("|%s| %s :  %s", formatter.format(new Date()), clientHandler.getNickname(), msg);
         for (ClientHandler client : clients) {

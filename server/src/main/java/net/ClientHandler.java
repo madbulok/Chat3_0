@@ -5,6 +5,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static net.CommandsRouter.*;
 
@@ -22,13 +24,15 @@ public class ClientHandler {
     }
 
     public ClientHandler(Server server, Socket socket) {
+        ExecutorService executorService1 = Executors.newSingleThreadExecutor();
         try {
             this.server = server;
             this.socket = socket;
             inputStream = new DataInputStream(socket.getInputStream());
             dataOutputStream = new DataOutputStream(socket.getOutputStream());
             socket.setSoTimeout(120000);
-            new Thread(()->{
+
+            executorService1.execute(()->{
                 try {
                     auth();
                     readMessages();
@@ -37,13 +41,16 @@ public class ClientHandler {
                 } finally {
                     closeConnections();
                 }
-            }).start();
+            });
 
         } catch (SocketException e){
             server.unsubscribe(this);
             System.out.println(nickname + " отключился");
+            executorService1.shutdown();
+
         }catch (IOException ex) {
             System.out.println("Непредвиденная ошибка");
+            executorService1.shutdown();
         }
     }
 

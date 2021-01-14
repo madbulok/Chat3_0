@@ -1,8 +1,8 @@
 package ui;
 
+import io.HistoryInteractor;
+import io.HistoryService;
 import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
-import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
@@ -12,7 +12,6 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import net.CommandsRouter;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -20,7 +19,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.URL;
 import java.util.ResourceBundle;
 
@@ -50,6 +48,8 @@ public class Controller implements Initializable {
     @FXML
     public ListView<String> clientList;
     public ComboBox<String> comboBox;
+
+    private HistoryService<String> historyService;
 
     private Socket socket;
     private DataInputStream inputStream;
@@ -88,14 +88,13 @@ public class Controller implements Initializable {
         comboBox.getItems().addAll(END_CONNECTION, CHANGE_NICKNAME, PRIVATE_MESSAGE);
         comboBox.setEditable(true);
 
-        comboBox.setOnAction(event->{
-            textField.setText(comboBox.getValue());
-        });
+        comboBox.setOnAction(event-> textField.setText(comboBox.getValue()));
 
         createRegWindow();
         Platform.runLater(()->{
             stage = (Stage)comboBox.getScene().getWindow();
             stage.setOnCloseRequest(windowEvent -> {
+
                 try {
                     disconnect();
                 } catch (UserNotLoginedException e) {
@@ -123,10 +122,8 @@ public class Controller implements Initializable {
             registrationStage = new Stage();
             registrationStage.setTitle("Регистрация");
             registrationStage.setScene(new Scene(root, 400, 250));
-
             regController = fxmlLoader.getController();
             regController.setController(this);
-
             registrationStage.initModality(Modality.APPLICATION_MODAL);
         } catch (IOException e) {
             e.printStackTrace();
@@ -136,7 +133,6 @@ public class Controller implements Initializable {
     private void connection(){
         try {
             socket = new Socket(IP_ADDRESS, PORT);
-
             inputStream = new DataInputStream(socket.getInputStream());
             dataOutputStream = new DataOutputStream(socket.getOutputStream());
 
@@ -147,6 +143,10 @@ public class Controller implements Initializable {
                         if (str.startsWith(AUTH_OK)){
                             nickname = str.split("\\s", 2)[1];
                             setAuthenticated(true);
+
+                            // начинаем процесс записи сообщений в журнал
+                            historyService = new HistoryInteractor(nickname);
+                            textArea.appendText(historyService.load());
                             break;
                         }
 
@@ -166,6 +166,7 @@ public class Controller implements Initializable {
                         // служебные команды
                         if (str.startsWith(ROOT)){
                             if (str.equals(END_CONNECTION)){
+                                historyService.save(textArea.getText());
                                 System.out.println("Client disconnect!");
                                 break;
                             }
@@ -183,17 +184,18 @@ public class Controller implements Initializable {
                             if (str.startsWith(CHANGE_NICKNAME)) {
                                 String[] token = str.split("\\s+", 2);
                                 setTitle(token[1]);
+                                historyService.changeFile(token[1]);
                             }
                         } else {
                             textArea.appendText(str + "\n");
                         }
                     }
                 } catch (EOFException e) {
-                    System.out.println();
-                }
-                catch (IOException e) {
+                    System.out.println(e.getMessage());
+                } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
+
                     textArea.clear();
                     System.out.println("Client disconnect!");
                     setAuthenticated(false);
